@@ -138,9 +138,10 @@ bool ImuDriver::bno055_init()
 {
     if(_bno055->begin(Adafruit_BNO055::OPERATION_MODE_IMUPLUS))
     {
+        _bno055->setAxisRemap(Adafruit_BNO055::REMAP_CONFIG_P3);
+        _bno055->setAxisSign(Adafruit_BNO055::REMAP_SIGN_P3);
+        ThisThread::sleep_for(50);
         _bno055->setExtCrystalUse(true);
-        // _bno055->setAxisRemap();
-        // _bno055->setAxisSign();
         return true;
     }
     return false;
@@ -183,10 +184,10 @@ void ImuDriver::bno055_loop()
             if (!imu_sensor_mail_box.full())
             {
                 ImuMesurement *msg = imu_sensor_mail_box.alloc();
-                msg->orientation[0] = (float)(x*scale);
-                msg->orientation[1] = (float)(y*scale);
-                msg->orientation[2] = (float)(z*scale);
-                msg->orientation[3] = (float)(w*scale);
+                msg->orientation[0] = x*scale;
+                msg->orientation[1] = y*scale;
+                msg->orientation[2] = z*scale;
+                msg->orientation[3] = w*scale;
                 msg->angular_velocity[0] = 0;
                 msg->angular_velocity[1] = 0;
                 msg->angular_velocity[2] = 0;
