@@ -150,10 +150,14 @@ bool ImuDriver::bno055_init()
 void ImuDriver::bno055_loop()
 {
     bool read_enable = false;
-    const double scale = (1.0 / (1 << 14));
+    const double quat_scale = (1.0 / (1 << 14));
+    const double accel_scale = 100.0 * 9.81;
+    const double gyro_scale = 16.0;
 
     uint8_t buffer[8];
-    int16_t x, y, z, w;
+    int16_t qx, qy, qz, qw;
+    int16_t ax, ay, az;
+    int16_t wx, wy, wz;
     
     while (1)
     {
@@ -173,27 +177,41 @@ void ImuDriver::bno055_loop()
         else if(read_enable)
         {
             memset(buffer, 0, 8);
-            x = y = z = w = 0;
-            /* Read quat data (8 bytes) */
+            qx = qy = qz = qw = 0;
             _bno055->readLen(Adafruit_BNO055::BNO055_QUATERNION_DATA_W_LSB_ADDR, buffer, 8);
-            w = (((uint16_t)buffer[1]) << 8) | ((uint16_t)buffer[0]);
-            x = (((uint16_t)buffer[3]) << 8) | ((uint16_t)buffer[2]);
-            y = (((uint16_t)buffer[5]) << 8) | ((uint16_t)buffer[4]);
-            z = (((uint16_t)buffer[7]) << 8) | ((uint16_t)buffer[6]);
+            qw = (((uint16_t)buffer[1]) << 8) | ((uint16_t)buffer[0]);
+            qx = (((uint16_t)buffer[3]) << 8) | ((uint16_t)buffer[2]);
+            qy = (((uint16_t)buffer[5]) << 8) | ((uint16_t)buffer[4]);
+            qz = (((uint16_t)buffer[7]) << 8) | ((uint16_t)buffer[6]);
+            
+            memset(buffer, 0, 6);
+            ax = ay = az = 0;
+            _bno055->readLen((Adafruit_BNO055::adafruit_bno055_reg_t)Adafruit_BNO055::VECTOR_ACCELEROMETER, buffer, 6);
+            ax = ((int16_t)buffer[0]) | (((int16_t)buffer[1]) << 8);
+            ay = ((int16_t)buffer[2]) | (((int16_t)buffer[3]) << 8);
+            az = ((int16_t)buffer[4]) | (((int16_t)buffer[5]) << 8);
+
+            memset(buffer, 0, 6);
+            wx = wy = wz = 0;
+            _bno055->readLen((Adafruit_BNO055::adafruit_bno055_reg_t)Adafruit_BNO055::VECTOR_GYROSCOPE, buffer, 6);
+            wx = ((int16_t)buffer[0]) | (((int16_t)buffer[1]) << 8);
+            wy = ((int16_t)buffer[2]) | (((int16_t)buffer[3]) << 8);
+            wz = ((int16_t)buffer[4]) | (((int16_t)buffer[5]) << 8);
+
             uint32_t timestap = Kernel::get_ms_count();
             if (!imu_sensor_mail_box.full())
             {
                 ImuMesurement *msg = imu_sensor_mail_box.alloc();
-                msg->orientation[0] = x*scale;
-                msg->orientation[1] = y*scale;
-                msg->orientation[2] = z*scale;
-                msg->orientation[3] = w*scale;
-                msg->angular_velocity[0] = 0;
-                msg->angular_velocity[1] = 0;
-                msg->angular_velocity[2] = 0;
-                msg->linear_velocity[0] = 0;
-                msg->linear_velocity[1] = 0;
-                msg->linear_velocity[2] = 0;
+                msg->orientation[0] = qx*quat_scale;
+                msg->orientation[1] = qy*quat_scale;
+                msg->orientation[2] = qz*quat_scale;
+                msg->orientation[3] = qw*quat_scale;
+                msg->angular_velocity[0] = wx / gyro_scale;
+                msg->angular_velocity[1] = wy / gyro_scale;
+                msg->angular_velocity[2] = wz / gyro_scale;
+                msg->linear_velocity[0] = ax / accel_scale;
+                msg->linear_velocity[1] = ay / accel_scale;
+                msg->linear_velocity[2] = az / accel_scale;
                 msg->timestamp = timestap;
                 imu_sensor_mail_box.put(msg);
             }
