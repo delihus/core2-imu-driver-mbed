@@ -3,6 +3,8 @@
 
 static I2C * i2c = nullptr;
 // static Timer * timer = nullptr;
+char mpu9250_write_buffer[128]; 
+int mpu9250_result;
 
 unsigned short constrain(
     unsigned short x,
@@ -34,30 +36,28 @@ int mbed_i2c_read(
     unsigned char length,
     unsigned char *data)
 {
-    const char RA[] = {reg_addr};
-    int result = i2c->write((int)(slave_addr << 1), RA, 1, 1);
-    result += i2c->read((int)(slave_addr << 1), (char *)data, length, 0);
-    return result;
+    mpu9250_write_buffer[0] = reg_addr;
+    mpu9250_result = 0;
+    mpu9250_result += i2c->write((int)(slave_addr << 1), mpu9250_write_buffer, 1, 1);
+    mpu9250_result += i2c->read((int)(slave_addr << 1), (char *)data, length, 0);
+    return mpu9250_result;
 }
 
 int mbed_i2c_write(
     unsigned char slave_addr,
     unsigned char reg_addr,
     unsigned char length,
-    unsigned char *data) {
-
-    int buffer_length = length + 1;
-    char buffer[buffer_length] = {reg_addr};
-    const char * RA = buffer;
-    memcpy(buffer+1, data, length);
-    
-    int result = i2c->write((int)(slave_addr << 1), (const char*)buffer, buffer_length, 0);
-    return result;
+    unsigned char *data) 
+{
+    mpu9250_write_buffer[0] = reg_addr;
+    memcpy(mpu9250_write_buffer+1, data, length);   
+    return i2c->write((int)(slave_addr << 1), mpu9250_write_buffer, length + 1, 0);
 }
 
 void get_ms(unsigned long *count)
 {
-    *count=Kernel::get_ms_count();
+    // *count=Kernel::get_ms_count();
+    *count = 0;
 }
 
 int reg_int_cb(
