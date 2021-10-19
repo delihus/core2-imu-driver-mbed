@@ -21,9 +21,9 @@ class ImuDriver :
 
         struct ImuMesurement 
         {
-            double orientation[4];
+            float orientation[4];
             float angular_velocity[3];
-            float linear_velocity[3];
+            float linear_acceleration[3];
             uint32_t timestamp;
         };
 

@@ -107,6 +107,7 @@ void ImuDriver::mpu9250_loop()
                 {
                     if (!imu_sensor_mail_box.full())
                     {
+                        uint32_t timestap = Kernel::get_ms_count();
                         ImuMesurement *msg = imu_sensor_mail_box.alloc();
                         msg->orientation[0] = _mpu9250->calcQuat(_mpu9250->qx);
                         msg->orientation[1] = _mpu9250->calcQuat(_mpu9250->qy);
@@ -115,10 +116,10 @@ void ImuDriver::mpu9250_loop()
                         msg->angular_velocity[0] = _mpu9250->calcGyro(_mpu9250->gx);
                         msg->angular_velocity[1] = _mpu9250->calcGyro(_mpu9250->gy);
                         msg->angular_velocity[2] = _mpu9250->calcGyro(_mpu9250->gz);
-                        msg->linear_velocity[0] = _mpu9250->calcAccel(_mpu9250->ax);
-                        msg->linear_velocity[1] = _mpu9250->calcAccel(_mpu9250->ay);
-                        msg->linear_velocity[2] = _mpu9250->calcAccel(_mpu9250->az);
-                        msg->timestamp = _mpu9250->time;
+                        msg->linear_acceleration[0] = _mpu9250->calcAccel(_mpu9250->ax);
+                        msg->linear_acceleration[1] = _mpu9250->calcAccel(_mpu9250->ay);
+                        msg->linear_acceleration[2] = _mpu9250->calcAccel(_mpu9250->az);
+                        msg->timestamp = timestap;
                         imu_sensor_mail_box.put(msg);
                     }
                 }
@@ -209,9 +210,9 @@ void ImuDriver::bno055_loop()
                 msg->angular_velocity[0] = wx / gyro_scale;
                 msg->angular_velocity[1] = wy / gyro_scale;
                 msg->angular_velocity[2] = wz / gyro_scale;
-                msg->linear_velocity[0] = ax / accel_scale;
-                msg->linear_velocity[1] = ay / accel_scale;
-                msg->linear_velocity[2] = az / accel_scale;
+                msg->linear_acceleration[0] = ax / accel_scale;
+                msg->linear_acceleration[1] = ay / accel_scale;
+                msg->linear_acceleration[2] = az / accel_scale;
                 msg->timestamp = timestap;
                 imu_sensor_mail_box.put(msg);
             }

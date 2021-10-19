@@ -25,7 +25,7 @@
 #include <mbed.h>
 
 #include "utility/imumaths.h"
-#include <Adafruit_Sensor.h>
+#include "Adafruit_Sensor.h"
 
 /** BNO055 Address A **/
 #define BNO055_ADDRESS_A (0x28)

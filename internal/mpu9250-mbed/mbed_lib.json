@@ -28,5 +28,15 @@
             "value": 1
         }
         
+    },
+    "target_overrides":
+    {
+        "CORE2":
+        {
+            "i2c-sda": "SENS2_PIN4",
+            "i2c-scl": "SENS2_PIN3",
+            "i2c-frequency": 100000,
+            "non-blocking": 1
+        }
     }
 }
