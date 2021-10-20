@@ -113,12 +113,20 @@ void ImuDriver::mpu9250_loop()
                         msg->orientation[1] = _mpu9250->calcQuat(_mpu9250->qy);
                         msg->orientation[2] = _mpu9250->calcQuat(_mpu9250->qz);
                         msg->orientation[3] = _mpu9250->calcQuat(_mpu9250->qw);
-                        msg->angular_velocity[0] = _mpu9250->calcGyro(_mpu9250->gx);
-                        msg->angular_velocity[1] = _mpu9250->calcGyro(_mpu9250->gy);
-                        msg->angular_velocity[2] = _mpu9250->calcGyro(_mpu9250->gz);
-                        msg->linear_acceleration[0] = _mpu9250->calcAccel(_mpu9250->ax);
-                        msg->linear_acceleration[1] = _mpu9250->calcAccel(_mpu9250->ay);
-                        msg->linear_acceleration[2] = _mpu9250->calcAccel(_mpu9250->az);
+
+                        msg->angular_velocity[0] = SENSORS_DPS_TO_RADS * _mpu9250->calcGyro(_mpu9250->gx);
+                        msg->angular_velocity[1] = SENSORS_DPS_TO_RADS * _mpu9250->calcGyro(_mpu9250->gy);
+                        msg->angular_velocity[2] = SENSORS_DPS_TO_RADS * _mpu9250->calcGyro(_mpu9250->gz);
+
+                        // raw accel data is not transformed
+                        // [accx]   [ 0 -1  0 ]   [accx_raw]
+                        // [accy] = [-1  0  0 ] * [accy_raw]
+                        // [accz]   [ 0  0 -1 ]   [accz_raw]
+                        
+                        msg->linear_acceleration[0] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->ay); 
+                        msg->linear_acceleration[1] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->ax);
+                        msg->linear_acceleration[2] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->az);
+
                         msg->timestamp = timestap;
                         imu_sensor_mail_box.put(msg);
                     }
@@ -141,7 +149,20 @@ bool ImuDriver::bno055_init()
     {
         _bno055->setAxisRemap(Adafruit_BNO055::REMAP_CONFIG_P3);
         _bno055->setAxisSign(Adafruit_BNO055::REMAP_SIGN_P3);
-        ThisThread::sleep_for(50);
+        
+        /* !!!!!!!!!!!!!!!! BNO055 UNIT SETTINGS !!!!!!!!!!!!!!!!!! */
+        _bno055->write8(Adafruit_BNO055::BNO055_PAGE_ID_ADDR, 0);
+        ThisThread::sleep_for(25);
+        /* Set the output units (based on section 3.6.1 Unit selection) */
+        uint8_t unitsel = (0 << 7) | // Orientation = Android
+                          (0 << 4) | // Temperature = Celsius
+                          (1 << 2) | // Euler = Rads
+                          (1 << 1) | // Gyro = Rads
+                          (0 << 0);  // Accelerometer = m/s^2
+        _bno055->write8(Adafruit_BNO055::BNO055_UNIT_SEL_ADDR, unitsel);
+        ThisThread::sleep_for(10);
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
         _bno055->setExtCrystalUse(true);
         return true;
     }
@@ -151,9 +172,10 @@ bool ImuDriver::bno055_init()
 void ImuDriver::bno055_loop()
 {
     bool read_enable = false;
-    const double quat_scale = (1.0 / (1 << 14));
-    const double accel_scale = 100.0 * 9.81;
-    const double gyro_scale = 16.0;
+    const double quat_scale = (1.0 / (1 << 14)); // normalized
+    const double accel_scale = 100.0; // m/s2
+    // const double gyro_scale = 16.0;  // dps
+    const double gyro_scale = 900.0;  // rps
 
     uint8_t buffer[8];
     int16_t qx, qy, qz, qw;
@@ -187,6 +209,8 @@ void ImuDriver::bno055_loop()
             
             memset(buffer, 0, 6);
             ax = ay = az = 0;
+            // VECTOR_ACCELEROMETER -> with gravity vector
+            // VECTOR_LINEARACCEL -> removed gravity vector
             _bno055->readLen((Adafruit_BNO055::adafruit_bno055_reg_t)Adafruit_BNO055::VECTOR_ACCELEROMETER, buffer, 6);
             ax = ((int16_t)buffer[0]) | (((int16_t)buffer[1]) << 8);
             ay = ((int16_t)buffer[2]) | (((int16_t)buffer[3]) << 8);
@@ -203,16 +227,16 @@ void ImuDriver::bno055_loop()
             if (!imu_sensor_mail_box.full())
             {
                 ImuMesurement *msg = imu_sensor_mail_box.alloc();
-                msg->orientation[0] = qx*quat_scale;
-                msg->orientation[1] = qy*quat_scale;
-                msg->orientation[2] = qz*quat_scale;
-                msg->orientation[3] = qw*quat_scale;
-                msg->angular_velocity[0] = wx / gyro_scale;
-                msg->angular_velocity[1] = wy / gyro_scale;
-                msg->angular_velocity[2] = wz / gyro_scale;
-                msg->linear_acceleration[0] = ax / accel_scale;
-                msg->linear_acceleration[1] = ay / accel_scale;
-                msg->linear_acceleration[2] = az / accel_scale;
+                msg->orientation[0] = (float)((double)qx * quat_scale);
+                msg->orientation[1] = (float)((double)qy * quat_scale);
+                msg->orientation[2] = (float)((double)qz * quat_scale);
+                msg->orientation[3] = (float)((double)qw * quat_scale);
+                msg->angular_velocity[0] = (float)((double)wx / gyro_scale);
+                msg->angular_velocity[1] = (float)((double)wy / gyro_scale);
+                msg->angular_velocity[2] = (float)((double)wz / gyro_scale);
+                msg->linear_acceleration[0] = (float)((double)ax / accel_scale);
+                msg->linear_acceleration[1] = (float)((double)ay / accel_scale);
+                msg->linear_acceleration[2] = (float)((double)az / accel_scale);
                 msg->timestamp = timestap;
                 imu_sensor_mail_box.put(msg);
             }
