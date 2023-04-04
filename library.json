@@ -1,0 +1,9 @@
+{
+    "name": "imu-driver",
+    "version": "1.0.0",
+    "description": "Mbed IMU driver library for ROSbot 2.0",
+    "keywords": "pio, imu",
+    "build": {
+      "builder": "MbedLibBuilder"
+    }
+  }
