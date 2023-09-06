@@ -1,13 +1,16 @@
 #ifndef __IMU_DRIVER_H__
 #define __IMU_DRIVER_H__
 
+#include <mbed.h>
 #include "internal/mpu9250-mbed/SparkFunMPU9250-DMP.h"
 #include "internal/bno055-mbed/Adafruit_BNO055.h"
+#include "internal/bhy2-mbed/src/BHY2.h"
 
 #define DEFAULT_ATTEMPTS_NUM 2
 #define FIFO_SAMPLE_RATE_OPERATION 10
+#define BHY2_DEFAULT_I2C_ADDR 0x28
 
-class ImuDriver : 
+class ImuDriver :
     private NonCopyable<ImuDriver>
 {
     public:
@@ -16,10 +19,11 @@ class ImuDriver :
             IMU_BNO055_ADDR_B,
             IMU_MPU9250,
             IMU_MPU9255,
+            IMU_BHY2,
             UNKNOWN
         };
 
-        struct ImuMesurement 
+        struct ImuMeasurement
         {
             float orientation[4];
             float angular_velocity[3];
@@ -36,21 +40,32 @@ class ImuDriver :
         ~ImuDriver(){};
 
     private:
+        static Type mpu9250_is_connected();
         bool mpu9250_init();
         void mpu9250_interrupt_cb();
         void mpu9250_loop();
 
-    private:
+        static Type bno055_is_connected();
         bool bno055_init();
         void bno055_loop();
 
-    private:
-        I2C * _i2c;
-        InterruptIn * _imu_int;
+        static Type bhy2_is_connected();
+        bool bhy2_init();
+        void bhy2_loop();
+
+        mbed::I2C * _i2c;
+        mbed::InterruptIn * _imu_int;
         Type _type;
+
         Adafruit_BNO055 * _bno055;
         MPU9250_DMP * _mpu9250;
-        Thread _thread;
+        BHY2 * _bhy2;
+
+        SensorQuaternion _bhy2_orientation_sensor;
+        SensorXYZ _bhy2_gyration_sensor;
+        SensorXYZ _bhy2_acceleration_sensor;
+
+        rtos::Thread _thread;
         bool _initialized;
         volatile uint16_t _new_data_flag;
 };

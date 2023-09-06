@@ -6,7 +6,7 @@
 #define STOP_FLAG 1
 #define START_FLAG 2
 
-Mail<ImuDriver::ImuMesurement, 10> imu_sensor_mail_box;
+Mail<ImuDriver::ImuMeasurement, 10> imu_sensor_mail_box;
 
 #pragma region MPU9250_FUNCTIONS
 
@@ -15,6 +15,21 @@ const signed char MPU925X_ORIENTATION_ROSBOT[9] = {
 	-1, 0, 0,
 	0, 0, -1
 };
+
+ImuDriver::Type ImuDriver::mpu9250_is_connected(){
+    uint8_t data;
+    if(mbed_i2c_read(MPU9250_DEFAULT_I2C_ADDR, MPU9250_WHO_AM_I, 1, &data) == INV_SUCCESS)
+    {
+        switch(data)
+        {
+            case MPU9250_WHO_AM_I_RESULT:
+                return ImuDriver::IMU_MPU9250;
+            case MPU9255_WHO_AM_I_RESULT:
+                return ImuDriver::IMU_MPU9255;
+        }
+    }
+    return Type::UNKNOWN;
+}
 
 void ImuDriver::mpu9250_interrupt_cb()
 {
@@ -39,7 +54,7 @@ bool ImuDriver::mpu9250_init()
                          FIFO_SAMPLE_RATE_OPERATION); // Set DMP FIFO rate
 
     err += _mpu9250->dmpSetOrientation(MPU925X_ORIENTATION_ROSBOT);
-    
+
     // err = _mpu9250->dmpSetOrientation(MPU_ORIENTATION);
     // The interrupt level can either be active-high or low.
     // Configure as active-low, since we'll be using the pin's
@@ -58,7 +73,7 @@ bool ImuDriver::mpu9250_init()
     // Use enableInterrupt() to configure the MPU-9250's
     // interrupt output as a "data ready" indicator.
     // err += _mpu9250->enableInterrupt(1);
-    
+
     // Disable dmp - it is enabled on demand using enableImu()
     // err = _mpu9250->dmpState(1);
     if(err == INV_SUCCESS)
@@ -108,7 +123,7 @@ void ImuDriver::mpu9250_loop()
                     if (!imu_sensor_mail_box.full())
                     {
                         uint32_t timestap = Kernel::get_ms_count();
-                        ImuMesurement *msg = imu_sensor_mail_box.alloc();
+                        ImuMeasurement *msg = imu_sensor_mail_box.alloc();
                         msg->orientation[0] = _mpu9250->calcQuat(_mpu9250->qx);
                         msg->orientation[1] = _mpu9250->calcQuat(_mpu9250->qy);
                         msg->orientation[2] = _mpu9250->calcQuat(_mpu9250->qz);
@@ -122,8 +137,8 @@ void ImuDriver::mpu9250_loop()
                         // [accx]   [ 0 -1  0 ]   [accx_raw]
                         // [accy] = [-1  0  0 ] * [accy_raw]
                         // [accz]   [ 0  0 -1 ]   [accz_raw]
-                        
-                        msg->linear_acceleration[0] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->ay); 
+
+                        msg->linear_acceleration[0] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->ay);
                         msg->linear_acceleration[1] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->ax);
                         msg->linear_acceleration[2] = -SENSORS_GRAVITY_EARTH * _mpu9250->calcAccel(_mpu9250->az);
 
@@ -139,9 +154,29 @@ void ImuDriver::mpu9250_loop()
     }
 }
 
-#pragma endregion MPU9250_FUNCTIONS
+ImuDriver::Type ImuDriver::bno055_is_connected(){
+    int res = BNO055_SUCCESS;
+    uint8_t data = 0;
+    res += mbed_i2c_write(BNO055_ADDRESS_A, Adafruit_BNO055::BNO055_PAGE_ID_ADDR, 1, &data);
+    ThisThread::sleep_for(50);
+    res += mbed_i2c_read(BNO055_ADDRESS_A, Adafruit_BNO055::BNO055_CHIP_ID_ADDR, 1, &data);
+    ThisThread::sleep_for(50);
+    if(res == BNO055_SUCCESS && data == BNO055_ID)
+    {
+        return ImuDriver::IMU_BNO055_ADDR_A;
+    }
 
-#pragma region BNO055_FUNCTIONS
+    res = BNO055_SUCCESS;
+    res += mbed_i2c_write(BNO055_ADDRESS_B, Adafruit_BNO055::BNO055_PAGE_ID_ADDR, 1, &data);
+    ThisThread::sleep_for(50);
+    res += mbed_i2c_read(BNO055_ADDRESS_B, Adafruit_BNO055::BNO055_CHIP_ID_ADDR, 1, &data);
+    ThisThread::sleep_for(50);
+    if(res == BNO055_SUCCESS && data == BNO055_ID)
+    {
+        return ImuDriver::IMU_BNO055_ADDR_B;
+    }
+    return ImuDriver::UNKNOWN;
+}
 
 bool ImuDriver::bno055_init()
 {
@@ -149,7 +184,7 @@ bool ImuDriver::bno055_init()
     {
         _bno055->setAxisRemap(Adafruit_BNO055::REMAP_CONFIG_P3);
         _bno055->setAxisSign(Adafruit_BNO055::REMAP_SIGN_P3);
-        
+
         /* !!!!!!!!!!!!!!!! BNO055 UNIT SETTINGS !!!!!!!!!!!!!!!!!! */
         _bno055->write8(Adafruit_BNO055::BNO055_PAGE_ID_ADDR, 0);
         ThisThread::sleep_for(25);
@@ -181,7 +216,7 @@ void ImuDriver::bno055_loop()
     int16_t qx, qy, qz, qw;
     int16_t ax, ay, az;
     int16_t wx, wy, wz;
-    
+
     while (1)
     {
         uint32_t flags = ThisThread::flags_get();
@@ -206,7 +241,7 @@ void ImuDriver::bno055_loop()
             qx = (((uint16_t)buffer[3]) << 8) | ((uint16_t)buffer[2]);
             qy = (((uint16_t)buffer[5]) << 8) | ((uint16_t)buffer[4]);
             qz = (((uint16_t)buffer[7]) << 8) | ((uint16_t)buffer[6]);
-            
+
             memset(buffer, 0, 6);
             ax = ay = az = 0;
             // VECTOR_ACCELEROMETER -> with gravity vector
@@ -226,7 +261,7 @@ void ImuDriver::bno055_loop()
             uint32_t timestap = Kernel::get_ms_count();
             if (!imu_sensor_mail_box.full())
             {
-                ImuMesurement *msg = imu_sensor_mail_box.alloc();
+                ImuMeasurement *msg = imu_sensor_mail_box.alloc();
                 msg->orientation[0] = (float)((double)qx * quat_scale);
                 msg->orientation[1] = (float)((double)qy * quat_scale);
                 msg->orientation[2] = (float)((double)qz * quat_scale);
@@ -245,63 +280,100 @@ void ImuDriver::bno055_loop()
     }
 }
 
-#pragma endregion BNO055_FUNCTIONS
+ImuDriver::Type ImuDriver::bhy2_is_connected(){
+    unsigned char data[2] = "1";
+    if(mbed_i2c_write(BHY2_DEFAULT_I2C_ADDR, 1, 1, data) == 0){
+        return Type::IMU_BHY2;
+    }
+    return Type::UNKNOWN;
+}
+
+bool ImuDriver::bhy2_init(){
+    bool ret = _bhy2->begin();
+    ret += _bhy2_orientation_sensor.begin(10, 0);
+    ret += _bhy2_gyration_sensor.begin(10, 0);
+    ret += _bhy2_acceleration_sensor.begin(10, 0);
+    return ret;
+}
+
+void ImuDriver::bhy2_loop(){
+    bool read_enable = false;
+    const double accel_scale = 1.0 / 4096.0 * 9.80665;; // m/s2
+    const double gyro_scale = 1.0 / 32.768;  // rps
+
+    while (1)
+    {
+        uint32_t flags = ThisThread::flags_get();
+        if (flags & START_FLAG)
+        {
+            read_enable = true;
+            ThisThread::flags_clear(START_FLAG);
+        }
+        else if (flags & STOP_FLAG)
+        {
+            read_enable = false;
+            ThisThread::flags_clear(STOP_FLAG);
+        }
+        else if(read_enable){
+            _bhy2->update();
+
+            if (!imu_sensor_mail_box.full())
+            {
+                uint32_t timestap = Kernel::get_ms_count();
+                ImuMeasurement *msg = imu_sensor_mail_box.alloc();
+                msg->orientation[0] = _bhy2_orientation_sensor.x();
+                msg->orientation[1] = _bhy2_orientation_sensor.y();
+                msg->orientation[2] = _bhy2_orientation_sensor.z();
+                msg->orientation[3] = _bhy2_orientation_sensor.w();
+
+                msg->angular_velocity[0] = _bhy2_gyration_sensor.x() * gyro_scale;
+                msg->angular_velocity[1] = _bhy2_gyration_sensor.y() * gyro_scale;
+                msg->angular_velocity[2] = _bhy2_gyration_sensor.z() * gyro_scale;
+
+                msg->linear_acceleration[0] = (float)_bhy2_acceleration_sensor.x() * accel_scale;
+                msg->linear_acceleration[1] = (float)_bhy2_acceleration_sensor.y() * accel_scale;
+                msg->linear_acceleration[2] = (float)_bhy2_acceleration_sensor.z() * accel_scale;
+
+                msg->timestamp = timestap;
+                imu_sensor_mail_box.put(msg);
+            }
+        }
+
+        ThisThread::sleep_for(100);
+    }
+}
 
 ImuDriver::Type ImuDriver::getType(I2C * i2c_instance, int attempts)
 {
-    ImuDriver::Type type = UNKNOWN;
-    int attempts_tmp = attempts; 
-    uint8_t data;
-    
+    int attempts_tmp = attempts;
     mbed_i2c_init(i2c_instance);
-    
+
     // check if MPU9250/MPU9255 is connected
     while(attempts_tmp--)
     {
-        if(mbed_i2c_read(MPU9250_DEFAULT_I2C_ADDR, MPU9250_WHO_AM_I, 1, &data) == INV_SUCCESS)
-        {
-            switch(data)
-            {
-                case MPU9250_WHO_AM_I_RESULT:
-                    return ImuDriver::IMU_MPU9250;
-                case MPU9255_WHO_AM_I_RESULT:
-                    return ImuDriver::IMU_MPU9255;
-            }
+        auto type = mpu9250_is_connected();
+        if(type != Type::UNKNOWN){
+            return type;
         }
     }
 
     ThisThread::sleep_for(50);
-
-    // check if BNO055 is connected
-    // ADDRESS_A
-    int res = BNO055_SUCCESS;
     attempts_tmp = attempts;
-    data = 0;
     while(attempts_tmp--)
     {
-        res += mbed_i2c_write(BNO055_ADDRESS_A, Adafruit_BNO055::BNO055_PAGE_ID_ADDR, 1, &data);
-        ThisThread::sleep_for(50);
-        res += mbed_i2c_read(BNO055_ADDRESS_A, Adafruit_BNO055::BNO055_CHIP_ID_ADDR, 1, &data);
-        ThisThread::sleep_for(50);
-        if(res == BNO055_SUCCESS && data == BNO055_ID)
-        {
-            return ImuDriver::IMU_BNO055_ADDR_A;
+        auto type = bno055_is_connected();
+        if(type != Type::UNKNOWN){
+            return type;
         }
     }
 
-    // ADDRESS_B
-    res = BNO055_SUCCESS;
+    ThisThread::sleep_for(50);
     attempts_tmp = attempts;
-    data = 0;
     while(attempts_tmp--)
     {
-        res += mbed_i2c_write(BNO055_ADDRESS_B, Adafruit_BNO055::BNO055_PAGE_ID_ADDR, 1, &data);
-        ThisThread::sleep_for(50);
-        res += mbed_i2c_read(BNO055_ADDRESS_B, Adafruit_BNO055::BNO055_CHIP_ID_ADDR, 1, &data);
-        ThisThread::sleep_for(50);
-        if(res == BNO055_SUCCESS && data == BNO055_ID)
-        {
-            return ImuDriver::IMU_BNO055_ADDR_B;
+        auto type = bhy2_is_connected();
+        if(type != Type::UNKNOWN){
+            return type;
         }
     }
 
@@ -314,7 +386,11 @@ ImuDriver::ImuDriver(I2C * i2c_instance, Type imu_type)
 , _type(imu_type)
 , _bno055(nullptr)
 , _mpu9250(nullptr)
-, _thread(osPriorityNormal,OS_STACK_SIZE,nullptr,"imu_thread")
+, _bhy2(nullptr)
+, _bhy2_orientation_sensor(SENSOR_ID_RV)
+, _bhy2_gyration_sensor(SENSOR_ID_GYRO)
+, _bhy2_acceleration_sensor(SENSOR_ID_LACC)
+, _thread(osPriorityNormal,OS_STACK_SIZE, nullptr, "imu_thread")
 , _initialized(false)
 {}
 
@@ -350,6 +426,17 @@ bool ImuDriver::init(){
             return true;
         }
     }
+    else if(_type == IMU_BHY2){
+        if(_bhy2 == nullptr)
+            _bhy2 = new BHY2();
+
+        if(bhy2_init())
+        {
+            _thread.start(callback(this,&ImuDriver::bhy2_loop));
+            _initialized = true;
+            return true;
+        }
+    }
     return false;
 }
 
@@ -369,4 +456,6 @@ bool ImuDriver::stop()
     return true;
 }
 
-bool ImuDriver::restart(){}
+bool ImuDriver::restart(){
+    return false;
+}
