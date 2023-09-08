@@ -8,7 +8,10 @@
 
 #define DEFAULT_ATTEMPTS_NUM 2
 #define FIFO_SAMPLE_RATE_OPERATION 10
+
 #define BHY2_DEFAULT_I2C_ADDR 0x28
+#define BHY2_VIRTUAL_SENSORS_RATE 50
+#define BHY2_VIRTUAL_SENSORS_LATENCY 0
 
 class ImuDriver :
     private NonCopyable<ImuDriver>

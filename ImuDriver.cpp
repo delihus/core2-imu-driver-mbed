@@ -1,3 +1,4 @@
+#include <math.h>
 #include "ImuDriver.h"
 #include "internal/mpu9250-mbed/util/mdcompat.h"
 #include "internal/mpu9250-mbed/MPU9250_RegisterMap.h"
@@ -292,9 +293,9 @@ void ImuDriver::bhy2_interrupt_cb(){
 
 bool ImuDriver::bhy2_init(){
     bool ret = _bhy2->begin(true, *_i2c);
-    ret += _bhy2_orientation_sensor.begin(10, 0);
-    ret += _bhy2_gyration_sensor.begin(10, 0);
-    ret += _bhy2_acceleration_sensor.begin(10, 0);
+    ret += _bhy2_orientation_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
+    ret += _bhy2_gyration_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
+    ret += _bhy2_acceleration_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
 
     _imu_int->rise(callback(this, &ImuDriver::bhy2_interrupt_cb));
     return ret;
@@ -302,8 +303,8 @@ bool ImuDriver::bhy2_init(){
 
 void ImuDriver::bhy2_loop(){
     bool read_enable = false;
-    const double accel_scale = 1.0 / 4096.0 * 9.80665;; // m/s2
-    const double gyro_scale = 1.0 / 32.768;  // rad/s
+    const double accel_scale = 9.80665 / 4096.0;; // m/s2
+    const double gyro_scale =  M_PI / 180.0 * 2.0 / 32.768 ;  // rad/s
 
     while (1)
     {
