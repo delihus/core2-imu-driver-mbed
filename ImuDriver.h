@@ -51,6 +51,7 @@ class ImuDriver :
 
         static Type bhy2_is_connected();
         bool bhy2_init();
+        void bhy2_interrupt_cb();
         void bhy2_loop();
 
         mbed::I2C * _i2c;

@@ -8,8 +8,6 @@
 
 Mail<ImuDriver::ImuMeasurement, 10> imu_sensor_mail_box;
 
-#pragma region MPU9250_FUNCTIONS
-
 const signed char MPU925X_ORIENTATION_ROSBOT[9] = {
 	0, -1, 0,
 	-1, 0, 0,
@@ -288,18 +286,24 @@ ImuDriver::Type ImuDriver::bhy2_is_connected(){
     return Type::UNKNOWN;
 }
 
+void ImuDriver::bhy2_interrupt_cb(){
+    core_util_atomic_incr_u16(&_new_data_flag,1);
+}
+
 bool ImuDriver::bhy2_init(){
-    bool ret = _bhy2->begin();
+    bool ret = _bhy2->begin(true, *_i2c);
     ret += _bhy2_orientation_sensor.begin(10, 0);
     ret += _bhy2_gyration_sensor.begin(10, 0);
     ret += _bhy2_acceleration_sensor.begin(10, 0);
+
+    _imu_int->rise(callback(this, &ImuDriver::bhy2_interrupt_cb));
     return ret;
 }
 
 void ImuDriver::bhy2_loop(){
     bool read_enable = false;
     const double accel_scale = 1.0 / 4096.0 * 9.80665;; // m/s2
-    const double gyro_scale = 1.0 / 32.768;  // rps
+    const double gyro_scale = 1.0 / 32.768;  // rad/s
 
     while (1)
     {
@@ -315,31 +319,33 @@ void ImuDriver::bhy2_loop(){
             ThisThread::flags_clear(STOP_FLAG);
         }
         else if(read_enable){
-            _bhy2->update();
+            if(_new_data_flag){
+                _bhy2->update();
 
-            if (!imu_sensor_mail_box.full())
-            {
-                uint32_t timestap = Kernel::get_ms_count();
-                ImuMeasurement *msg = imu_sensor_mail_box.alloc();
-                msg->orientation[0] = _bhy2_orientation_sensor.x();
-                msg->orientation[1] = _bhy2_orientation_sensor.y();
-                msg->orientation[2] = _bhy2_orientation_sensor.z();
-                msg->orientation[3] = _bhy2_orientation_sensor.w();
+                if (!imu_sensor_mail_box.full())
+                {
+                    uint32_t timestap = Kernel::get_ms_count();
+                    ImuMeasurement *msg = imu_sensor_mail_box.alloc();
+                    msg->orientation[0] = _bhy2_orientation_sensor.x();
+                    msg->orientation[1] = _bhy2_orientation_sensor.y();
+                    msg->orientation[2] = _bhy2_orientation_sensor.z();
+                    msg->orientation[3] = _bhy2_orientation_sensor.w();
 
-                msg->angular_velocity[0] = _bhy2_gyration_sensor.x() * gyro_scale;
-                msg->angular_velocity[1] = _bhy2_gyration_sensor.y() * gyro_scale;
-                msg->angular_velocity[2] = _bhy2_gyration_sensor.z() * gyro_scale;
+                    msg->angular_velocity[0] = _bhy2_gyration_sensor.x() * gyro_scale;
+                    msg->angular_velocity[1] = _bhy2_gyration_sensor.y() * gyro_scale;
+                    msg->angular_velocity[2] = _bhy2_gyration_sensor.z() * gyro_scale;
 
-                msg->linear_acceleration[0] = (float)_bhy2_acceleration_sensor.x() * accel_scale;
-                msg->linear_acceleration[1] = (float)_bhy2_acceleration_sensor.y() * accel_scale;
-                msg->linear_acceleration[2] = (float)_bhy2_acceleration_sensor.z() * accel_scale;
+                    msg->linear_acceleration[0] = (float)_bhy2_acceleration_sensor.x() * accel_scale;
+                    msg->linear_acceleration[1] = (float)_bhy2_acceleration_sensor.y() * accel_scale;
+                    msg->linear_acceleration[2] = (float)_bhy2_acceleration_sensor.z() * accel_scale;
 
-                msg->timestamp = timestap;
-                imu_sensor_mail_box.put(msg);
+                    msg->timestamp = timestap;
+                    imu_sensor_mail_box.put(msg);
+                }
+                core_util_atomic_decr_u16(&_new_data_flag,1);
             }
+            ThisThread::sleep_for(20);
         }
-
-        ThisThread::sleep_for(100);
     }
 }
 
@@ -429,6 +435,11 @@ bool ImuDriver::init(){
     else if(_type == IMU_BHY2){
         if(_bhy2 == nullptr)
             _bhy2 = new BHY2();
+
+        if(_imu_int == nullptr){
+            // TODO: this is connected to hEx
+            _imu_int = new InterruptIn(SENS3_PIN1);
+        }
 
         if(bhy2_init())
         {
