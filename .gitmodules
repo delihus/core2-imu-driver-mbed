@@ -1,3 +1,0 @@
-[submodule "internal/bhy2-mbed"]
-	path = internal/bhy2-mbed
-	url = https://github.com/delihus/BHY2-mbed.git
