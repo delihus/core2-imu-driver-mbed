@@ -1,4 +1,3 @@
-#include <math.h>
 #include "ImuDriver.h"
 #include "internal/mpu9250-mbed/util/mdcompat.h"
 #include "internal/mpu9250-mbed/MPU9250_RegisterMap.h"
@@ -368,7 +367,7 @@ ImuDriver::Type ImuDriver::getType(I2C * i2c_instance, int attempts)
     attempts_tmp = attempts;
     while(attempts_tmp--)
     {
-        auto type = bno055_is_connected();
+        auto type = bhy2_is_connected();
         if(type != Type::UNKNOWN){
             return type;
         }
@@ -378,7 +377,7 @@ ImuDriver::Type ImuDriver::getType(I2C * i2c_instance, int attempts)
     attempts_tmp = attempts;
     while(attempts_tmp--)
     {
-        auto type = bhy2_is_connected();
+        auto type = bno055_is_connected();
         if(type != Type::UNKNOWN){
             return type;
         }
