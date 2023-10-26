@@ -291,12 +291,10 @@ void ImuDriver::bhy2_interrupt_cb(){
 }
 
 bool ImuDriver::bhy2_init(){
-    bool ret = _bhy2->begin(true, *_i2c);
+    bool ret = _bhy2->begin(*_i2c, *_imu_int_gpio);
     ret += _bhy2_orientation_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
     ret += _bhy2_gyration_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
     ret += _bhy2_acceleration_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
-
-    _imu_int->rise(callback(this, &ImuDriver::bhy2_interrupt_cb));
     return ret;
 }
 
@@ -307,6 +305,8 @@ void ImuDriver::bhy2_loop(){
 
     while (1)
     {
+        if(*_imu_int_gpio)
+            bhy2_interrupt_cb();
         uint32_t flags = ThisThread::flags_get();
         if (flags & START_FLAG)
         {
@@ -386,9 +386,10 @@ ImuDriver::Type ImuDriver::getType(I2C * i2c_instance, int attempts)
     return UNKNOWN;
 }
 
-ImuDriver::ImuDriver(I2C * i2c_instance, Type imu_type)
+ImuDriver::ImuDriver(mbed::I2C * i2c_instance, Type imu_type)
 : _i2c(i2c_instance)
 , _imu_int(nullptr)
+, _imu_int_gpio(nullptr)
 , _type(imu_type)
 , _bno055(nullptr)
 , _mpu9250(nullptr)
@@ -436,9 +437,10 @@ bool ImuDriver::init(){
         if(_bhy2 == nullptr)
             _bhy2 = new BHY2();
 
-        if(_imu_int == nullptr){
+        if(_imu_int_gpio == nullptr){
             // TODO: this is connected to hEx
-            _imu_int = new InterruptIn(SENS3_PIN1);
+            _imu_int_gpio = new DigitalIn(SENS3_PIN1);
+            DigitalOut led3(LED3, 1);
         }
 
         if(bhy2_init())
