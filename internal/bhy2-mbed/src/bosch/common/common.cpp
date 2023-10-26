@@ -101,7 +101,7 @@ const char* get_api_error(int8_t error_code)
   return ret;
 }
 
-void setup_interfaces(bool reset_power, mbed::I2C &i2c_ptr, mbed::DigitalIn& int_pin, enum bhy2_intf intf)
+void setup_interfaces(bool reset_power, mbed::I2C &i2c_ptr, enum bhy2_intf intf)
 {
   // SPI communication not implemented
   if(intf != BHY2_I2C_INTERFACE){
@@ -109,7 +109,6 @@ void setup_interfaces(bool reset_power, mbed::I2C &i2c_ptr, mbed::DigitalIn& int
   }
 
   i2c = &i2c_ptr;
-  bhy2_int_pin = &int_pin;
 
   i2c->frequency(IMU_I2C_FREQUENCY);
 

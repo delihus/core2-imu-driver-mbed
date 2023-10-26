@@ -59,7 +59,6 @@ class ImuDriver :
 
         mbed::I2C * _i2c;
         mbed::InterruptIn * _imu_int;
-        mbed::DigitalIn * _imu_int_gpio;
         Type _type;
 
         Adafruit_BNO055 * _bno055;

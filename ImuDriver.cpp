@@ -291,7 +291,7 @@ void ImuDriver::bhy2_interrupt_cb(){
 }
 
 bool ImuDriver::bhy2_init(){
-    bool ret = _bhy2->begin(*_i2c, *_imu_int_gpio);
+    bool ret = _bhy2->begin(*_i2c);
     ret += _bhy2_orientation_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
     ret += _bhy2_gyration_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
     ret += _bhy2_acceleration_sensor.begin(BHY2_VIRTUAL_SENSORS_RATE, BHY2_VIRTUAL_SENSORS_LATENCY);
@@ -299,26 +299,10 @@ bool ImuDriver::bhy2_init(){
 }
 
 void ImuDriver::bhy2_loop(){
-    bool read_enable = false;
     const double accel_scale = 9.80665 / 4096.0;; // m/s2
     const double gyro_scale =  M_PI / 180.0 * 2.0 / 32.768 ;  // rad/s
-
     while (1)
     {
-        if(*_imu_int_gpio)
-            bhy2_interrupt_cb();
-        uint32_t flags = ThisThread::flags_get();
-        if (flags & START_FLAG)
-        {
-            read_enable = true;
-            ThisThread::flags_clear(START_FLAG);
-        }
-        else if (flags & STOP_FLAG)
-        {
-            read_enable = false;
-            ThisThread::flags_clear(STOP_FLAG);
-        }
-        else if(read_enable){
             if(_new_data_flag){
                 _bhy2->update();
 
@@ -345,7 +329,6 @@ void ImuDriver::bhy2_loop(){
                 core_util_atomic_decr_u16(&_new_data_flag,1);
             }
             ThisThread::sleep_for(20);
-        }
     }
 }
 
@@ -389,7 +372,6 @@ ImuDriver::Type ImuDriver::getType(I2C * i2c_instance, int attempts)
 ImuDriver::ImuDriver(mbed::I2C * i2c_instance, Type imu_type)
 : _i2c(i2c_instance)
 , _imu_int(nullptr)
-, _imu_int_gpio(nullptr)
 , _type(imu_type)
 , _bno055(nullptr)
 , _mpu9250(nullptr)
@@ -437,15 +419,17 @@ bool ImuDriver::init(){
         if(_bhy2 == nullptr)
             _bhy2 = new BHY2();
 
-        if(_imu_int_gpio == nullptr){
-            // TODO: this is connected to hEx
-            _imu_int_gpio = new DigitalIn(SENS3_PIN1);
-            DigitalOut led3(LED3, 1);
+        if(_imu_int == nullptr)
+        {
+            _imu_int = new mbed::InterruptIn(SENS3_PIN1);
+            _imu_int->mode(PullUp);
         }
 
         if(bhy2_init())
         {
             _thread.start(callback(this,&ImuDriver::bhy2_loop));
+            _imu_int->rise(callback(this,&ImuDriver::bhy2_interrupt_cb));
+
             _initialized = true;
             return true;
         }

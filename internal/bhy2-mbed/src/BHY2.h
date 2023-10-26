@@ -24,7 +24,7 @@ public:
   BHY2();
   virtual ~BHY2();
 
-  bool begin(mbed::I2C &i2c_ptr, mbed::DigitalIn& int_pin);
+  bool begin(mbed::I2C &i2c_ptr);
 
   /**
    *  @brief Update sensor data by reading the FIFO buffer on the BHI260 and then pass it to a suitable parser.

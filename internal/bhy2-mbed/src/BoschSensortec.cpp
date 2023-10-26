@@ -11,9 +11,9 @@ BoschSensortec::~BoschSensortec()
   close_interfaces(BHY2_I2C_INTERFACE);
 }
 
-bool BoschSensortec::begin(mbed::I2C &i2c_ptr, mbed::DigitalIn& int_pin)
+bool BoschSensortec::begin(mbed::I2C &i2c_ptr)
 {
-  setup_interfaces(true, i2c_ptr, int_pin, BHY2_I2C_INTERFACE);
+  setup_interfaces(true, i2c_ptr, BHY2_I2C_INTERFACE);
   auto ret =
       bhy2_init(BHY2_I2C_INTERFACE, bhy2_i2c_read, bhy2_i2c_write, bhy2_delay_us, MAX_READ_WRITE_LEN, NULL, &_bhy2);
   if (_debug)
@@ -197,11 +197,8 @@ uint8_t BoschSensortec::acknowledgment()
 
 void BoschSensortec::update()
 {
-  if (get_interrupt_status())
-  {
     auto ret = bhy2_get_and_process_fifo(_workBuffer, WORK_BUFFER_SIZE, &_bhy2);
     if (_debug) _debug->printf(get_api_error(ret));
-  }
 }
 
 void BoschSensortec::debug(mbed::Stream& stream)

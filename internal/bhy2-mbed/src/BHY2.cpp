@@ -33,9 +33,9 @@ void BHY2::setLDOTimeout(int time) {
   _timeout = time;
 }
 
-bool BHY2::begin(mbed::I2C &i2c_ptr, mbed::DigitalIn& int_pin)
+bool BHY2::begin(mbed::I2C &i2c_ptr)
 {
-  return sensortec.begin(i2c_ptr, int_pin);
+  return sensortec.begin(i2c_ptr);
 }
 
 void BHY2::update()

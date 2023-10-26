@@ -37,7 +37,7 @@ public:
    *
    * @return true successful initialisation of SPI interface
    */
-  bool begin(mbed::I2C &i2c_ptr, mbed::DigitalIn& int_pin);
+  bool begin(mbed::I2C &i2c_ptr);
   /**
    * @brief Update data on FIFO buffer
    *
